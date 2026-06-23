@@ -1,5 +1,23 @@
+import { useState, useRef, useMemo, useEffect } from "react";
+
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwddyDUAIGPCJVzWqd1ROKqxPJy1BjVZThapCwPOkhk1mK-wv-WJcU_1z7oZvegOok/exec';
-import { useState, useRef, useMemo } from "react";
+
+async function dbGet(sheet) {
+  try {
+    const res = await fetch(`${APPS_SCRIPT_URL}?action=get&sheet=${sheet}`);
+    const json = await res.json();
+    return json.success ? json.data : [];
+  } catch (e) { return []; }
+}
+
+async function dbSet(sheet, data) {
+  try {
+    await fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'set', sheet, payload: data }),
+    });
+  } catch (e) { console.error(e); }
+}
 
 const TODAY = '2026-06-16';
 const PROJECT_COLORS = ['#4285F4', '#A142F4', '#34A853', '#EA4335', '#FBBC04', '#00ACC1', '#FF7043', '#8D6E63'];
@@ -48,8 +66,8 @@ const SEED_TASKS = [
   { id: 't5', projectId: 'p1', title: '內部測試', status: 'todo', assignee: '小美', start: '2026-06-26', end: '2026-07-03', startTime: '09:00', endTime: '18:00', priority: 'medium', milestone: false, deps: ['t3', 't4'], desc: '', subtasks: [], comments: [], custom: {} },
   { id: 't6', projectId: 'p1', title: '上線發布', status: 'todo', assignee: '阿凱', start: '2026-07-04', end: '2026-07-04', startTime: '14:00', endTime: '15:00', priority: 'high', milestone: true, deps: ['t5'], desc: '', subtasks: [], comments: [], custom: {} },
   { id: 't7', projectId: 'p1', title: '客戶驗收會議', status: 'review', assignee: 'Tina', start: '2026-06-20', end: '2026-06-20', startTime: '10:00', endTime: '11:00', priority: 'low', milestone: false, deps: [], desc: '', subtasks: [], comments: [], custom: {} },
-  { id: 'u1', projectId: 'p2', title: '市場調查與受眾分析', status: 'done', assignee: 'Wendy', start: '2026-06-01', end: '2026-06-06', startTime: '09:00', endTime: '18:00', priority: 'medium', milestone: false, deps: [], desc: '', subtasks: [], comments: [], custom: { cf2: 'CA-208' } },
-  { id: 'u2', projectId: 'p2', title: '創意內容企劃', status: 'inprogress', assignee: '阿凱', start: '2026-06-05', end: '2026-06-16', startTime: '09:00', endTime: '18:00', priority: 'high', milestone: false, deps: ['u1'], desc: '', subtasks: [], comments: [], custom: { cf2: 'CA-208' } },
+  { id: 'u1', projectId: 'p2', title: '市場調查與受眾分析', status: 'done', assignee: 'Wendy', start: '2026-06-01', end: '2026-06-06', startTime: '09:00', endTime: '18:00', priority: 'medium', milestone: false, deps: [], desc: '', subtasks: [], comments: [], custom: {} },
+  { id: 'u2', projectId: 'p2', title: '創意內容企劃', status: 'inprogress', assignee: '阿凱', start: '2026-06-05', end: '2026-06-16', startTime: '09:00', endTime: '18:00', priority: 'high', milestone: false, deps: ['u1'], desc: '', subtasks: [], comments: [], custom: {} },
   { id: 'u3', projectId: 'p2', title: '社群廣告素材製作', status: 'todo', assignee: 'Tina', start: '2026-06-15', end: '2026-06-24', startTime: '09:00', endTime: '18:00', priority: 'medium', milestone: false, deps: ['u2'], desc: '', subtasks: [], comments: [], custom: {} },
   { id: 'u4', projectId: 'p2', title: '廣告投放上線', status: 'todo', assignee: 'Wendy', start: '2026-06-25', end: '2026-06-25', startTime: '09:00', endTime: '10:00', priority: 'high', milestone: true, deps: ['u3'], desc: '', subtasks: [], comments: [], custom: {} },
   { id: 'u5', projectId: 'p2', title: '期中成效檢視會議', status: 'todo', assignee: '阿凱', start: '2026-06-30', end: '2026-06-30', startTime: '10:00', endTime: '11:00', priority: 'low', milestone: false, deps: [], desc: '', subtasks: [], comments: [], custom: {} },
@@ -156,7 +174,7 @@ function Dashboard({ theme, projects, tasks, activity, onOpenProject, onNewTask,
               </div>
               <div className="flex items-center justify-between">
                 <div className="flex -space-x-1.5">
-                  {p.members.slice(0, 4).map(m => (
+                  {(Array.isArray(p.members) ? p.members : []).slice(0, 4).map(m => (
                     <div key={m} className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] text-white border-2" style={{ backgroundColor: avatarColor(m), borderColor: theme.dark ? '#1f2937' : '#ffffff' }}>{initials(m)}</div>
                   ))}
                 </div>
@@ -189,8 +207,8 @@ function Dashboard({ theme, projects, tasks, activity, onOpenProject, onNewTask,
 }
 
 function TaskCard({ task, theme, onClick, onDelete, projectTag }) {
-  const pc = PRIORITY[task.priority];
-  const sc = STATUS[task.status];
+  const pc = PRIORITY[task.priority] || PRIORITY.medium;
+  const sc = STATUS[task.status] || STATUS.todo;
   return (
     <div onClick={onClick} className={`group rounded-xl border ${theme.border} ${theme.surface} p-3 mb-2 cursor-pointer shadow-sm hover:shadow-md transition-shadow`}>
       <div className="flex items-center justify-between mb-2">
@@ -207,7 +225,7 @@ function TaskCard({ task, theme, onClick, onDelete, projectTag }) {
           <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs text-white font-medium" style={{ backgroundColor: avatarColor(task.assignee) }}>{initials(task.assignee)}</div>
           <span className={`text-xs ${theme.sub}`}>{task.assignee}</span>
         </div>
-        <span className={`text-xs ${theme.sub}`}>⏰ {task.end.slice(5)} {task.endTime}</span>
+        <span className={`text-xs ${theme.sub}`}>⏰ {task.end ? task.end.slice(5) : ''} {task.endTime}</span>
       </div>
     </div>
   );
@@ -264,6 +282,8 @@ function ListView({ tasks, theme, onRowClick, onDelete, customFields, projects, 
         <tbody>
           {tasks.map(t => {
             const tag = multiProject ? projects.find(p => p.id === t.projectId) : null;
+            const sc = STATUS[t.status] || STATUS.todo;
+            const pc = PRIORITY[t.priority] || PRIORITY.medium;
             return (
               <tr key={t.id} onClick={() => onRowClick(t.id)} className={`border-t ${theme.border} cursor-pointer ${theme.hover}`}>
                 <td className={`px-4 py-3 font-medium ${theme.text}`}>{t.title}</td>
@@ -274,8 +294,8 @@ function ListView({ tasks, theme, onRowClick, onDelete, customFields, projects, 
                     <span className={theme.sub}>{t.assignee}</span>
                   </div>
                 </td>
-                <td className="px-4 py-3"><span className="text-xs px-2 py-1 rounded-full font-medium" style={{ backgroundColor: STATUS[t.status].color + '20', color: STATUS[t.status].color }}>{STATUS[t.status].label}</span></td>
-                <td className="px-4 py-3"><span className="text-xs px-2 py-1 rounded-full font-medium" style={{ backgroundColor: PRIORITY[t.priority].color + '20', color: PRIORITY[t.priority].color }}>{PRIORITY[t.priority].label}</span></td>
+                <td className="px-4 py-3"><span className="text-xs px-2 py-1 rounded-full font-medium" style={{ backgroundColor: sc.color + '20', color: sc.color }}>{sc.label}</span></td>
+                <td className="px-4 py-3"><span className="text-xs px-2 py-1 rounded-full font-medium" style={{ backgroundColor: pc.color + '20', color: pc.color }}>{pc.label}</span></td>
                 <td className={`px-4 py-3 ${theme.sub}`}>{t.end} {t.endTime}</td>
                 {customFields.map(cf => <td key={cf.id} className={`px-4 py-3 ${theme.sub}`}>{(t.custom && t.custom[cf.id]) || '—'}</td>)}
                 <td className="px-4 py-3 text-right">
@@ -365,7 +385,7 @@ function GanttChart({ tasks, theme, dark }) {
         }))}
         {rows.map((t, i) => {
           const y = headerH + i * rowH + rowH / 2;
-          const sc = STATUS[t.status];
+          const sc = STATUS[t.status] || STATUS.todo;
           if (t.milestone) {
             const cx = xFor(t.start) + dayW / 2;
             return <path key={'bar' + t.id} d={`M${cx},${y - 9} L${cx + 9},${y} L${cx},${y + 9} L${cx - 9},${y} Z`} fill={sc.color} />;
@@ -478,7 +498,7 @@ function NotesView({ theme, notes, selectedNoteId, onSelectNote, onToggleTodo, o
           <>
             <h3 className={`text-lg font-semibold mb-4 ${theme.text}`}>{note.title}</h3>
             <div className="space-y-2">
-              {note.blocks.map(b => {
+              {(note.blocks || []).map(b => {
                 if (b.type === 'heading') return <div key={b.id} className={`text-base font-semibold mt-3 ${theme.text}`}>{b.text}</div>;
                 if (b.type === 'todo') return (
                   <label key={b.id} className="flex items-center gap-2 cursor-pointer">
@@ -693,6 +713,35 @@ export default function App() {
   const [showNewProjectModal, setShowNewProjectModal] = useState(false);
   const [filterProjectIds, setFilterProjectIds] = useState([]);
   const [filterAssignee, setFilterAssignee] = useState('all');
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadData() {
+      const [p, t, n] = await Promise.all([
+        dbGet('projects'),
+        dbGet('tasks'),
+        dbGet('notes'),
+      ]);
+      if (p && p.length > 0) setProjects(p.map(proj => ({
+        ...proj,
+        members: proj.members ? (typeof proj.members === 'string' ? JSON.parse(proj.members) : proj.members) : [],
+      })));
+      if (t && t.length > 0) setTasks(t.map(task => ({
+        ...task,
+        deps: task.deps ? (typeof task.deps === 'string' ? JSON.parse(task.deps) : task.deps) : [],
+        subtasks: task.subtasks ? (typeof task.subtasks === 'string' ? JSON.parse(task.subtasks) : task.subtasks) : [],
+        comments: task.comments ? (typeof task.comments === 'string' ? JSON.parse(task.comments) : task.comments) : [],
+        custom: task.custom ? (typeof task.custom === 'string' ? JSON.parse(task.custom) : task.custom) : {},
+        milestone: task.milestone === 'true' || task.milestone === true,
+      })));
+      if (n && n.length > 0) setNotes(n.map(note => ({
+        ...note,
+        blocks: note.blocks ? (typeof note.blocks === 'string' ? JSON.parse(note.blocks) : note.blocks) : [],
+      })));
+      setLoading(false);
+    }
+    loadData();
+  }, []);
 
   const theme = {
     dark,
@@ -716,34 +765,81 @@ export default function App() {
     setActiveProjectId(id); setView('project'); setActiveTab('kanban');
     setFilterProjectIds([id]); setFilterAssignee('all');
   }
-  function updateTask(field, value) { setTasks(prev => prev.map(t => t.id === selectedTaskId ? { ...t, [field]: value } : t)); }
-  function moveTask(id, status) { setTasks(prev => prev.map(t => t.id === id ? { ...t, status } : t)); }
-  function deleteTask(id) { setTasks(prev => prev.filter(t => t.id !== id)); setSelectedTaskId(null); }
+  function updateTask(field, value) {
+    setTasks(prev => {
+      const updated = prev.map(t => t.id === selectedTaskId ? { ...t, [field]: value } : t);
+      dbSet('tasks', updated);
+      return updated;
+    });
+  }
+  function moveTask(id, status) {
+    setTasks(prev => {
+      const updated = prev.map(t => t.id === id ? { ...t, status } : t);
+      dbSet('tasks', updated);
+      return updated;
+    });
+  }
+  function deleteTask(id) {
+    setTasks(prev => {
+      const updated = prev.filter(t => t.id !== id);
+      dbSet('tasks', updated);
+      return updated;
+    });
+    setSelectedTaskId(null);
+  }
   function addComment(text) {
-    setTasks(prev => prev.map(t => t.id === selectedTaskId ? { ...t, comments: [...(t.comments || []), { id: 'c' + Date.now(), user: '我', text, time: '剛剛' }] } : t));
+    setTasks(prev => {
+      const updated = prev.map(t => t.id === selectedTaskId ? { ...t, comments: [...(t.comments || []), { id: 'c' + Date.now(), user: '我', text, time: '剛剛' }] } : t);
+      dbSet('tasks', updated);
+      return updated;
+    });
   }
   function toggleSubtask(stId) {
-    setTasks(prev => prev.map(t => t.id === selectedTaskId ? { ...t, subtasks: t.subtasks.map(s => s.id === stId ? { ...s, done: !s.done } : s) } : t));
+    setTasks(prev => {
+      const updated = prev.map(t => t.id === selectedTaskId ? { ...t, subtasks: t.subtasks.map(s => s.id === stId ? { ...s, done: !s.done } : s) } : t);
+      dbSet('tasks', updated);
+      return updated;
+    });
   }
   function toggleNoteTodo(noteId, blockId) {
-    setNotes(prev => prev.map(n => n.id === noteId ? { ...n, blocks: n.blocks.map(b => b.id === blockId ? { ...b, done: !b.done } : b) } : n));
+    setNotes(prev => {
+      const updated = prev.map(n => n.id === noteId ? { ...n, blocks: n.blocks.map(b => b.id === blockId ? { ...b, done: !b.done } : b) } : n);
+      dbSet('notes', updated);
+      return updated;
+    });
   }
   function addBlock(noteId, type, text) {
-    setNotes(prev => prev.map(n => n.id === noteId ? { ...n, blocks: [...n.blocks, { id: 'b' + Date.now(), type, text, done: false }] } : n));
+    setNotes(prev => {
+      const updated = prev.map(n => n.id === noteId ? { ...n, blocks: [...n.blocks, { id: 'b' + Date.now(), type, text, done: false }] } : n);
+      dbSet('notes', updated);
+      return updated;
+    });
   }
   function addNote(title) {
     const id = 'n' + Date.now();
-    setNotes(prev => [...prev, { id, projectId: activeProjectId, title, blocks: [] }]);
+    setNotes(prev => {
+      const updated = [...prev, { id, projectId: activeProjectId, title, blocks: [] }];
+      dbSet('notes', updated);
+      return updated;
+    });
     setSelectedNoteId(id);
   }
   function handleNewTask(data) {
     const id = 't' + Date.now();
-    setTasks(prev => [...prev, { id, projectId: data.projectId, title: data.title, status: 'todo', assignee: data.assignee, start: data.startDate, end: data.endDate, startTime: '09:00', endTime: '18:00', priority: data.priority, milestone: data.milestone, deps: [], desc: '', subtasks: [], comments: [], custom: {} }]);
+    setTasks(prev => {
+      const updated = [...prev, { id, projectId: data.projectId, title: data.title, status: 'todo', assignee: data.assignee, start: data.startDate, end: data.endDate, startTime: '09:00', endTime: '18:00', priority: data.priority, milestone: data.milestone, deps: [], desc: '', subtasks: [], comments: [], custom: {} }];
+      dbSet('tasks', updated);
+      return updated;
+    });
     setShowNewTaskModal(false);
   }
   function handleNewProject(data) {
     const id = 'p' + Date.now();
-    setProjects(prev => [...prev, { id, name: data.name, color: data.color, desc: data.desc, members: [] }]);
+    setProjects(prev => {
+      const updated = [...prev, { id, name: data.name, color: data.color, desc: data.desc, members: [] }];
+      dbSet('projects', updated);
+      return updated;
+    });
     setCustomFields(prev => ({ ...prev, [id]: [] }));
     setShowNewProjectModal(false);
   }
@@ -755,6 +851,17 @@ export default function App() {
     { key: 'calendar', label: '日曆' },
     { key: 'notes', label: '筆記' },
   ];
+
+  if (loading) {
+    return (
+      <div className={`min-h-screen ${theme.bg} flex items-center justify-center`} style={{ fontFamily: 'system-ui,-apple-system,sans-serif' }}>
+        <div className="text-center">
+          <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
+          <p className={`text-sm ${theme.sub}`}>載入資料中...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (view === 'dashboard') {
     return (
