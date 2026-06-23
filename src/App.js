@@ -1,6 +1,27 @@
 import { useState, useRef, useMemo, useEffect } from "react";
 import { Moon, Sun, LayoutGrid, List, BarChart3, Calendar, FolderOpen, FileText, Settings, AlertCircle, Download, Flag, Clock, X, ChevronRight, Paperclip, CheckSquare, Plus, Trash2, GripVertical, Pencil, Users, RefreshCw } from "lucide-react";
 
+//資料庫程式(誤動)
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwddyDUAIGPCJVzWqd1ROKqxPJy1BjVZThapCwPOkhk1mK-wv-WJcU_1z7oZvegOok/exec';
+
+async function dbGet(sheet) {
+  try {
+    const res = await fetch(`${APPS_SCRIPT_URL}?action=get&sheet=${sheet}`);
+    const json = await res.json();
+    return json.success ? json.data : [];
+  } catch (e) { return []; }
+}
+
+async function dbSet(sheet, data) {
+  try {
+    await fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'set', sheet, payload: data }),
+    });
+  } catch (e) { console.error(e); }
+}
+//誤動
+
 const TODAY = '2026-06-16';
 const PROJECT_COLORS = ['#4285F4', '#A142F4', '#34A853', '#EA4335', '#FBBC04', '#00ACC1', '#FF7043', '#8D6E63'];
 const NOTE_COLORS = ['#FEF3C7', '#DBEAFE', '#DCFCE7', '#FCE7F3', '#FFE4E0'];
@@ -1445,6 +1466,35 @@ export default function App() {
   const [showNewProjectModal, setShowNewProjectModal] = useState(false);
   const [editingProject, setEditingProject] = useState(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+
+  //資料庫(誤動)
+  useEffect(() => {
+  async function loadData() {
+    const [p, t, n] = await Promise.all([
+      dbGet('projects'), dbGet('tasks'), dbGet('notes'),
+    ]);
+    if (p && p.length > 0) setProjects(p.map(proj => ({
+      ...proj,
+      members: proj.members ? (typeof proj.members === 'string' ? JSON.parse(proj.members) : proj.members) : [],
+    })));
+    if (t && t.length > 0) setTasks(t.map(task => ({
+      ...task,
+      deps: task.deps ? (typeof task.deps === 'string' ? JSON.parse(task.deps) : task.deps) : [],
+      subtasks: task.subtasks ? (typeof task.subtasks === 'string' ? JSON.parse(task.subtasks) : task.subtasks) : [],
+      comments: task.comments ? (typeof task.comments === 'string' ? JSON.parse(task.comments) : task.comments) : [],
+      custom: task.custom ? (typeof task.custom === 'string' ? JSON.parse(task.custom) : task.custom) : {},
+      milestone: task.milestone === 'true' || task.milestone === true,
+    })));
+    if (n && n.length > 0) setNotes(n.map(note => ({
+      ...note,
+      blocks: note.blocks ? (typeof note.blocks === 'string' ? JSON.parse(note.blocks) : note.blocks) : [],
+    })));
+  }
+  loadData();
+}, []);
+//誤動
+
+
 
   const theme = {
     dark,
