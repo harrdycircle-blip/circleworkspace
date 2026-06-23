@@ -1419,8 +1419,8 @@ function MembersPage({ theme, projects, tasks }) {
   );
 }
 
-export default function ProjectAssistant() {
-  const [dark, setDark] = useState(false);
+export default function App() {
+    const [dark, setDark] = useState(false);
   const [view, setView] = useState('dashboard');
   const [projects, setProjects] = useState(SEED_PROJECTS);
   const [activeProjectId, setActiveProjectId] = useState(null);
