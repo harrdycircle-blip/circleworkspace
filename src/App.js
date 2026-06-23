@@ -1,3 +1,4 @@
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwddyDUAIGPCJVzWqd1ROKqxPJy1BjVZThapCwPOkhk1mK-wv-WJcU_1z7oZvegOok/exec';
 import { useState, useRef, useMemo } from "react";
 
 const TODAY = '2026-06-16';
