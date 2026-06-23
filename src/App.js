@@ -2,7 +2,6 @@ import { useState, useRef, useMemo } from "react";
 
 const TODAY = '2026-06-16';
 const PROJECT_COLORS = ['#4285F4', '#A142F4', '#34A853', '#EA4335', '#FBBC04', '#00ACC1', '#FF7043', '#8D6E63'];
-const NOTE_COLORS = ['#FEF3C7', '#DBEAFE', '#DCFCE7', '#FCE7F3', '#FFE4E0'];
 
 function addDays(dateStr, n) {
   const d = new Date(dateStr + 'T00:00:00');
@@ -76,14 +75,6 @@ const SEED_NOTES = [
     { id: 'b9', type: 'heading', text: '目標客群' },
     { id: 'b10', type: 'text', text: '本季聚焦 25-35 歲都市專業族群，主打社群口碑擴散與口碑推薦。' },
   ]},
-];
-
-const SEED_ATTACHMENTS = [
-  { id: 'a1', projectId: 'p1', name: '視覺設計稿_v2.fig', size: '4.2 MB', by: '阿凱', date: '2026-06-10' },
-  { id: 'a2', projectId: 'p1', name: 'API規格書.pdf', size: '860 KB', by: 'Tina', date: '2026-06-08' },
-  { id: 'a3', projectId: 'p1', name: '使用者調查結果.xlsx', size: '1.1 MB', by: '小美', date: '2026-06-03' },
-  { id: 'a4', projectId: 'p2', name: 'Q3預算總表.xlsx', size: '320 KB', by: 'Wendy', date: '2026-06-05' },
-  { id: 'a5', projectId: 'p3', name: '效能測試報告.pdf', size: '2.0 MB', by: 'Leo', date: '2026-06-01' },
 ];
 
 const SEED_ACTIVITY = [
@@ -717,7 +708,6 @@ export default function App() {
   const projectNotes = notes.filter(n => n.projectId === activeProjectId);
   const projectFields = customFields[activeProjectId] || [];
   const selectedTask = tasks.find(t => t.id === selectedTaskId);
-  const assignees = Array.from(new Set(tasks.map(t => t.assignee))).filter(Boolean);
   const filteredTasks = tasks.filter(t => filterProjectIds.includes(t.projectId) && (filterAssignee === 'all' || t.assignee === filterAssignee));
   const multiProject = filterProjectIds.length > 1;
 
